@@ -15,15 +15,28 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import ValidationError
 from starlette.responses import JSONResponse, Response, StreamingResponse
 
-from .llm import OPENAI_API_KEY, chunk_translation, stream_llm_analysis
+from .llm import OPENAI_API_KEY, chunk_translation, run_llm_analysis
 from .models import AnnotationBundle, TtsJobCreate, VocabularyCreate, bundle_to_jsonable
 from .semantics import validate_annotation_semantics
+from .security import client_safe_message
 from .throttle_cache import body_hash, cache_get, cache_set, check_throttle
 
 log = logging.getLogger(__name__)
 
+def _cors_origins() -> list[str]:
+    raw = os.environ.get("CORS_ORIGINS", "").strip()
+    if not raw:
+        return ["http://127.0.0.1:5173", "http://localhost:5173"]
+    return [o.strip() for o in raw.split(",") if o.strip()]
+
+
 app = FastAPI(title="Grammar Station API (Python)")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_cors_origins(),
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
+)
 
 _tts_jobs: dict[str, dict[str, Any]] = {}
 
@@ -42,18 +55,7 @@ def _sse_line(obj: dict[str, Any]) -> bytes:
 
 
 def _format_sse_error(exc: BaseException) -> str:
-    """部分异常 str(e) 为空，保证 SSE 里始终有可读说明。"""
-    msg = str(exc).strip()
-    if msg:
-        return msg[:4000]
-    name = type(exc).__name__
-    if getattr(exc, "args", None):
-        a0 = exc.args[0]
-        if isinstance(a0, str) and a0.strip():
-            return f"{name}: {a0.strip()}"[:4000]
-        if a0 is not None and repr(a0) != "None":
-            return f"{name}: {a0!r}"[:4000]
-    return f"{name}（无详细说明，请查看服务端日志）"
+    return client_safe_message(exc)
 
 
 @app.get("/api/health")
@@ -76,7 +78,7 @@ async def analyze(request: Request) -> Response:
     except Exception as e:
         return JSONResponse(
             status_code=400,
-            content={"error": "invalid_json", "message": str(e)},
+            content={"error": "invalid_json", "message": "请求体不是合法 JSON"},
         )
 
     try:

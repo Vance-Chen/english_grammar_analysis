@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 from collections.abc import AsyncIterator
 from typing import Any
@@ -9,6 +10,9 @@ from typing import Any
 import httpx
 
 from .models import AnnotationBundle, bundle_to_jsonable
+from .security import redact_secrets
+
+log = logging.getLogger(__name__)
 
 OPENAI_BASE_URL = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
@@ -113,7 +117,8 @@ async def _chat_completion(
             ) from e
 
     if not res.is_success:
-        raise RuntimeError(f"LLM HTTP {res.status_code}: {res.text[:500]}")
+        log.error("LLM upstream HTTP %s: %s", res.status_code, redact_secrets(res.text[:500]))
+        raise RuntimeError(f"LLM 请求失败（HTTP {res.status_code}）")
     raw = (res.json().get("choices") or [{}])[0].get("message", {}).get("content")
     if not raw:
         raise RuntimeError("LLM 无内容返回")

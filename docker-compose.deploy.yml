@@ -1,16 +1,12 @@
-# 镜像拷贝部署用 compose（目标服务器无需源码，只需本文件 + 环境变量 + 已 load 的镜像）
-#
-# 启动：
-#   docker compose -f docker-compose.deploy.yml --env-file .env.example up -d
-#
-# 镜像名/标签在 .env.example 中通过 API_IMAGE、WEB_IMAGE 配置
+# 镜像拷贝 / Hub 拉取部署（目标机无需源码）
+# 启动：docker compose -f docker-compose.deploy.yml --env-file .env up -d
 
 services:
   api:
     image: ${API_IMAGE:-grammar-station-api:latest}
     restart: unless-stopped
     env_file:
-      - ${ENV_FILE:-.env.example}
+      - ${ENV_FILE:-.env}
     expose:
       - "8788"
     healthcheck:
