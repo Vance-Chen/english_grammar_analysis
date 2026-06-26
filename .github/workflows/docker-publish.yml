@@ -1,0 +1,80 @@
+# 推送 main 或打版本 tag 时，自动构建 api / web 镜像并推送到 Docker Hub。
+#
+# 在 GitHub 仓库 Settings → Secrets and variables → Actions 中配置：
+#   DOCKERHUB_USERNAME  — ace11133
+#   DOCKERHUB_TOKEN     — Docker Hub Access Token（非登录密码）
+#
+# 可选 Variables（Settings → Secrets and variables → Actions → Variables）：
+#   DOCKER_IMAGE_PREFIX — 镜像名前缀，默认 grammar-station
+#     生成：{DOCKERHUB_USERNAME}/grammar-station-api 与 grammar-station-web
+
+name: Docker Build and Push
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+env:
+  REGISTRY: docker.io
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: api
+            context: ./api-py
+            file: ./api-py/Dockerfile
+            image_suffix: grammar-station-api
+          - service: web
+            context: ./web
+            file: ./web/Dockerfile
+            image_suffix: grammar-station-web
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.image_suffix }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,prefix=
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=ref,event=tag
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+
+      - name: Image digest
+        run: echo "${{ matrix.service }} pushed — ${{ steps.meta.outputs.tags }}"

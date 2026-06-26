@@ -3,7 +3,7 @@
 
 services:
   api:
-    image: ${API_IMAGE:-grammar-station-api:latest}
+    image: ${API_IMAGE:-ace11133/grammar-station-api:latest}
     restart: unless-stopped
     env_file:
       - ${ENV_FILE:-.env}
@@ -23,7 +23,7 @@ services:
       start_period: 10s
 
   web:
-    image: ${WEB_IMAGE:-grammar-station-web:latest}
+    image: ${WEB_IMAGE:-ace11133/grammar-station-web:latest}
     restart: unless-stopped
     ports:
       - "${WEB_PORT:-8080}:80"

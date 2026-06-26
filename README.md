@@ -147,14 +147,56 @@ curl -s http://127.0.0.1:8080/api/health
 docker compose --env-file .env build
 docker save grammar-station-api:latest grammar-station-web:latest -o grammar-station-images.tar
 
-# 推送到 Docker Hub（需 docker login）
-docker tag grammar-station-api:latest  YOUR_USER/grammar-station-api:latest
-docker tag grammar-station-web:latest YOUR_USER/grammar-station-web:latest
-docker push YOUR_USER/grammar-station-api:latest
-docker push YOUR_USER/grammar-station-web:latest
+# 推送到 Docker Hub（https://hub.docker.com/u/ace11133）
+docker tag grammar-station-api:latest  ace11133/grammar-station-api:latest
+docker tag grammar-station-web:latest ace11133/grammar-station-web:latest
+docker push ace11133/grammar-station-api:latest
+docker push ace11133/grammar-station-web:latest
 ```
 
 目标机：`docker-compose.deploy.yml` + `.env` + `docker load` 或 `docker pull`。
+
+### GitHub Actions 自动构建并推送 Docker Hub
+
+仓库已包含 [`.github/workflows/docker-publish.yml`](.github/workflows/docker-publish.yml)。
+
+**触发条件**
+
+- 推送到 `main` 分支 → 构建并推送 `latest` + commit sha 标签
+- 推送 `v*` 标签（如 `v1.0.0`）→ 额外打上 semver 标签
+
+**一次性配置（GitHub 仓库 Settings → Secrets and variables → Actions）**
+
+| 名称 | 类型 | 说明 |
+|------|------|------|
+| `DOCKERHUB_USERNAME` | Secret | 填 `ace11133` |
+| `DOCKERHUB_TOKEN` | Secret | [Access Token](https://hub.docker.com/settings/security)（不要用登录密码） |
+
+在 [ace11133 的 Docker Hub](https://hub.docker.com/u/ace11133) 创建两个仓库（若尚未存在）：
+
+- `grammar-station-api`
+- `grammar-station-web`
+
+推送 `main` 后镜像地址：
+
+```
+ace11133/grammar-station-api:latest
+ace11133/grammar-station-web:latest
+```
+
+**生产机 `.env` 示例**
+
+```env
+API_IMAGE=ace11133/grammar-station-api:latest
+WEB_IMAGE=ace11133/grammar-station-web:latest
+```
+
+```bash
+docker compose -f docker-compose.deploy.yml --env-file .env pull
+docker compose -f docker-compose.deploy.yml --env-file .env up -d
+```
+
+在 GitHub 仓库 **Actions** 页可查看每次构建日志；失败时多为 Secret 未配置或 Hub 仓库名不存在。
 
 ## 测试验证
 
