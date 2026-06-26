@@ -1,0 +1,36 @@
+# 镜像拷贝部署用 compose（目标服务器无需源码，只需本文件 + 环境变量 + 已 load 的镜像）
+#
+# 启动：
+#   docker compose -f docker-compose.deploy.yml --env-file .env.example up -d
+#
+# 镜像名/标签在 .env.example 中通过 API_IMAGE、WEB_IMAGE 配置
+
+services:
+  api:
+    image: ${API_IMAGE:-grammar-station-api:latest}
+    restart: unless-stopped
+    env_file:
+      - ${ENV_FILE:-.env.example}
+    expose:
+      - "8788"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8788/api/health', timeout=3)",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  web:
+    image: ${WEB_IMAGE:-grammar-station-web:latest}
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    depends_on:
+      api:
+        condition: service_healthy

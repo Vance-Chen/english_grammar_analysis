@@ -1,0 +1,14 @@
+{
+  "name": "grammar-station",
+  "private": true,
+  "scripts": {
+    "build": "npm run build --prefix web",
+    "dev:api": "cd api-py && set -a && . ../.env.example && set +a && .venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8788 --reload",
+    "dev:web": "npm run dev --prefix web",
+    "verify": "npm run build --prefix web && npm run typecheck --prefix web && cd api-py && .venv/bin/python -c \"from app.main import app; print('verify ok:', app.title)\"",
+    "docker:up": "docker compose --env-file .env.example up -d --build",
+    "docker:down": "docker compose --env-file .env.example down",
+    "docker:save": "docker compose --env-file .env.example build && docker save grammar-station-api:${IMAGE_TAG:-latest} grammar-station-web:${IMAGE_TAG:-latest} -o grammar-station-images.tar",
+    "docker:deploy": "docker compose -f docker-compose.deploy.yml --env-file .env.example up -d"
+  }
+}
